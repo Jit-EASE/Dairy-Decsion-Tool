@@ -21,7 +21,7 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 
 st.markdown(
     """
-<div style="text-align:center; background:#8b9098; padding:1rem; border-radius:12px;">
+<div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
   <h2>Irish Dairy Processing Decision Tool — <em>Executive Intelligent Edition</em></h2>
   <p>Quantum × AI × Optimisation for Ireland’s dairy industry.<br>
   QUBO · MILP · VRP · RAG with GPT-4o-mini auto-insights (PPO RL optional, TensorBoard-free).</p>
@@ -96,6 +96,14 @@ preset       = st.sidebar.selectbox("Preset Strategy", ["Custom", "Max Margin", 
 st.sidebar.markdown("### Alerts")
 cheddar_trigger = st.sidebar.number_input("Cheddar > €/t triggers replan", 3000, 7000, 5200, 100)
 dryer_trigger   = st.sidebar.slider("Dryer utilisation trigger (%)", 50, 100, 90, 5)
+
+# Auto baseline so KPIs update even before running optimizers
+auto_from_map = st.sidebar.checkbox(
+    "Auto-allocate from map for KPIs",
+    True,
+    help="Use farms in the current map view to create a baseline mix. Replaced when QUBO/PPO/MILP runs."
+)
+st.session_state["auto_from_map"] = auto_from_map
 
 # =========================== Synthetic data ==============================
 @st.cache_data(show_spinner=False)
@@ -240,6 +248,38 @@ def check_alerts(allocation):
     if dryer_util > dryer_trigger:
         alerts.append(f"Dryer utilisation {dryer_util:.0f}%")
     return alerts
+
+# Helper to auto-allocate from synthetic map supply (kl)
+def _auto_alloc_from_supply(total_kl: float) -> dict:
+    """
+    Build a baseline product mix from total milk (kl) using yields and clip by plant capacities.
+    This is only used to populate KPIs before any optimizer runs.
+    """
+    if total_kl <= 0:
+        return {}
+    ylds = expected_yields_for_window(MILK, SPECS)  # t per kl
+
+    # Neutral product shares (adjust if desired)
+    share = {"Butter": 0.25, "Cheddar": 0.25, "WMP": 0.25, "SMP": 0.15, "Casein": 0.10}
+    alloc = {p: float(total_kl * ylds[p] * share.get(p, 0.0)) for p in PRODUCTS}
+
+    # Capacity clipping
+    caps = PLANT.set_index("resource")["value"].to_dict()
+    dryer_cap  = float(caps.get("dryer_capacity_t", 1e12))
+    cheese_cap = float(caps.get("cheese_vat_t",     1e12))
+    butter_cap = float(caps.get("butter_churn_t",   1e12))
+    casein_cap = float(caps.get("casein_line_t",    1e12))
+
+    pair = alloc.get("WMP", 0.0) + alloc.get("SMP", 0.0)
+    if pair > dryer_cap and pair > 0:
+        scale = dryer_cap / pair
+        alloc["WMP"] *= scale
+        alloc["SMP"] *= scale
+
+    alloc["Cheddar"] = min(alloc.get("Cheddar", 0.0), cheese_cap)
+    alloc["Butter"]  = min(alloc.get("Butter",  0.0), butter_cap)
+    alloc["Casein"]  = min(alloc.get("Casein",  0.0), casein_cap)
+    return alloc
 
 # --------------------------- County centers + static sites ---------------------------
 # Approximate county centroids (deg). Used to generate farms & default placements.
@@ -763,6 +803,17 @@ def render_geospatial_header(county_filter: str = "All"):
     km_cost = 1.6
     st.session_state.vrp_cost = float(total_km * km_cost)
 
+    # Expose a synthetic milk supply (kl) based on farms shown vs. "all farms"
+    try:
+        avg_daily_kl = float(MILK["milk_litres"].mean() / 1000.0)  # average day, kl
+        farms_all = 25 * len(COUNTY_CENTERS)  # we generate 25 farms per county in total view
+        scaler = len(farms) / float(farms_all) if farms_all > 0 else 0.0
+        total_kl = max(0.0, avg_daily_kl * scaler)
+    except Exception:
+        # Fallback: assign 30 kl per farm
+        total_kl = float(len(farms)) * 30.0
+    st.session_state["_map_supply_kl"] = total_kl
+
     st_folium(m, width=None, height=460)
 
 # =========================== RAG + GPT ==================================
@@ -838,6 +889,14 @@ No code or formulas; state implications, risks, opportunities."""
 # County filter for the map
 county_filter = st.sidebar.selectbox("County filter", ["All"] + sorted(COUNTY_CENTERS.keys()))
 render_geospatial_header(county_filter)
+
+# Auto baseline allocation for KPIs from the map view
+if st.session_state.get("auto_from_map", False):
+    total_kl = float(st.session_state.get("_map_supply_kl", 0.0))
+    if total_kl > 0 and (not st.session_state.ctx_alloc or st.session_state.get("_alloc_source") == "auto"):
+        st.session_state.ctx_alloc = _auto_alloc_from_supply(total_kl)
+        st.session_state["_alloc_source"] = "auto"
+
 k_now = kpi_strip()
 alerts = check_alerts(st.session_state.ctx_alloc)
 if alerts:
@@ -899,6 +958,7 @@ elif section == "Production Portfolio Optimizer":
         bits, E, solver = solve_qubo(Q, H)
         alloc = decode(bits)
     st.session_state.ctx_alloc = alloc
+    st.session_state["_alloc_source"] = "qubo"
     df = pd.DataFrame(list(alloc.items()), columns=["Product","Tonnes"]).sort_values("Tonnes", ascending=False)
     st.plotly_chart(px.bar(df, x="Product", y="Tonnes", title=f"Recommended Mix (QUBO via {solver})"),
                     use_container_width=True)
@@ -930,6 +990,7 @@ elif section == "Learning Allocator (AI, optional)":
                 else:
                     st.session_state.ctx_alloc = alloc
                     st.session_state.ppo_alloc = alloc
+                    st.session_state["_alloc_source"] = "ppo"
                     df = pd.DataFrame(list(alloc.items()), columns=["Product","Tonnes"])
                     st.plotly_chart(px.bar(df, x="Product", y="Tonnes", title="Learning Policy Mix"),
                                     use_container_width=True)
@@ -964,6 +1025,7 @@ elif section == "Commercial Plan (MILP)":
         tot = pd.DataFrame(sol["ship"]).sum(axis=0).to_dict()
         st.session_state.ctx_alloc = {k: float(v) for k, v in tot.items()}
         st.session_state.milp_alloc = st.session_state.ctx_alloc
+        st.session_state["_alloc_source"] = "milp"
     else:
         st.error(f"Solve status: {sol.get('status')}")
     explain_section(section, "MILP balances production/inventory/demand with sustainability-adjusted margins.")
