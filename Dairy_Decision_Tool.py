@@ -21,7 +21,7 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 
 st.markdown(
     """
-<div style="text-align:center; background:#04F404; padding:1rem; border-radius:12px;">
+<div style="text-align:center; background:#8b9098; padding:1rem; border-radius:12px;">
   <h2>Irish Dairy Processing Decision Tool — <em>Executive Intelligent Edition</em></h2>
   <p>Quantum × AI × Optimisation for Ireland’s dairy industry.<br>
   QUBO · MILP · VRP · RAG with GPT-4o-mini auto-insights (PPO RL optional, TensorBoard-free).</p>
@@ -240,6 +240,68 @@ def check_alerts(allocation):
     if dryer_util > dryer_trigger:
         alerts.append(f"Dryer utilisation {dryer_util:.0f}%")
     return alerts
+
+# --------------------------- County centers + static sites ---------------------------
+# Approximate county centroids (deg). Used to generate farms & default placements.
+COUNTY_CENTERS = {
+    "Carlow": (52.83, -6.93),
+    "Cavan": (53.99, -7.36),
+    "Clare": (52.86, -8.98),
+    "Cork": (51.95, -8.70),
+    "Donegal": (54.65, -8.10),
+    "Dublin": (53.35, -6.26),
+    "Galway": (53.27, -9.06),
+    "Kerry": (52.27, -9.70),
+    "Kildare": (53.16, -6.91),
+    "Kilkenny": (52.65, -7.25),
+    "Laois": (53.03, -7.30),
+    "Leitrim": (54.13, -8.00),
+    "Limerick": (52.66, -8.63),
+    "Longford": (53.73, -7.80),
+    "Louth": (53.95, -6.54),
+    "Mayo": (53.85, -9.30),
+    "Meath": (53.65, -6.65),
+    "Monaghan": (54.25, -6.97),
+    "Offaly": (53.27, -7.49),
+    "Roscommon": (53.63, -8.20),
+    "Sligo": (54.27, -8.47),
+    "Tipperary": (52.60, -8.00),
+    "Waterford": (52.26, -7.11),
+    "Westmeath": (53.54, -7.35),
+    "Wexford": (52.34, -6.46),
+    "Wicklow": (52.99, -6.35),
+}
+
+# Major ports around Ireland (approximate coordinates).
+PORTS_STATIC = [
+    {"name":"Dublin Port","lat":53.345,"lon":-6.215},
+    {"name":"Cork (Ringaskiddy)","lat":51.810,"lon":-8.300},
+    {"name":"Shannon Foynes","lat":52.610,"lon":-9.110},
+    {"name":"Waterford (Belview)","lat":52.250,"lon":-7.000},
+    {"name":"Rosslare Europort","lat":52.260,"lon":-6.340},
+    {"name":"Galway Port","lat":53.270,"lon":-9.050},
+    {"name":"Killybegs","lat":54.630,"lon":-8.450},
+    {"name":"Drogheda","lat":53.720,"lon":-6.250},
+    {"name":"Dundalk","lat":54.000,"lon":-6.380},
+    {"name":"New Ross","lat":52.400,"lon":-6.950},
+    {"name":"Bantry (Whiddy)","lat":51.680,"lon":-9.450},
+    {"name":"Sligo Port","lat":54.270,"lon":-8.470},
+]
+
+# Example processor sites (representative, approximate).
+PROCESSORS_STATIC = [
+    {"name":"Mallow Processor","county":"Cork","lat":52.137,"lon":-8.636},
+    {"name":"Mitchelstown Processor","county":"Cork","lat":52.270,"lon":-8.270},
+    {"name":"Ballineen Processor","county":"Cork","lat":51.720,"lon":-9.110},
+    {"name":"Listowel Processor","county":"Kerry","lat":52.440,"lon":-9.490},
+    {"name":"Nenagh Processor","county":"Tipperary","lat":52.860,"lon":-8.200},
+    {"name":"Ballyragget Processor","county":"Kilkenny","lat":52.780,"lon":-7.350},
+    {"name":"Belview Processor","county":"Kilkenny","lat":52.250,"lon":-7.000},
+    {"name":"Charleville Processor","county":"Limerick","lat":52.350,"lon":-8.670},
+    {"name":"Ballaghaderreen Processor","county":"Roscommon","lat":53.900,"lon":-8.580},
+    {"name":"Killeshandra Processor","county":"Cavan","lat":54.050,"lon":-7.430},
+    {"name":"Virginia Processor","county":"Cavan","lat":53.830,"lon":-7.080},
+]
 
 # =========================== QUBO + qLDPC ===============================
 def build_parity_matrix(n_bits, check_density=0.25, seed=123):
@@ -559,7 +621,16 @@ def solve_vrp_ortools(coops, plants, ports, vehicle_capacity_kl=25000, km_cost=1
             index = sol.Value(routing.NextVar(index))
     return {"legs": pd.DataFrame(legs), "total_km": total_km, "transport_cost_eur": total_km * km_cost}
 
-def render_geospatial_header():
+def render_geospatial_header(county_filter: str = "All"):
+    """
+    Draws an interactive map with farms → co-ops → processors → ports.
+    - County dropdown filters farms & co-ops. Processors/ports remain visible.
+    - Connections are nearest-neighbour paths:
+        Farm -> nearest Co-op (prefer same county)
+        Co-op -> nearest Processor
+        Processor -> nearest Port
+    Also updates st.session_state.vrp_cost using a simple €/km cost.
+    """
     if not HAS_FOL:
         st.info("Install folium + streamlit-folium for the interactive map.")
         st.session_state.vrp_cost = 0.0
@@ -568,37 +639,131 @@ def render_geospatial_header():
     import folium
     from streamlit_folium import st_folium
 
-    coops = pd.DataFrame({
-        "name":["Coop A","Coop B","Coop C"],
-        "lat":[52.65,53.10,51.95], "lon":[-8.62,-6.90,-8.48],
-        "demand_kl":[8000,9000,7000]
-    })
-    plants = pd.DataFrame({"name":["Processor X"], "lat":[52.27], "lon":[-7.12]})
-    ports  = pd.DataFrame({"name":["Port Cork"],   "lat":[51.90], "lon":[-8.47]})
+    rng = np.random.default_rng(7)
 
-    res = solve_vrp_ortools(coops, plants, ports)
+    # Static layers
+    ports = pd.DataFrame(PORTS_STATIC)
+    processors = pd.DataFrame(PROCESSORS_STATIC)
 
-    m = folium.Map(location=[53,-8], zoom_start=6, tiles="OpenStreetMap")
-    for _,r in coops.iterrows():
-        folium.CircleMarker([r.lat, r.lon], radius=6, color="green", fill=True,
-                            popup=f"{r.name} ({int(r.demand_kl)} kl)").add_to(m)
-    for _,r in plants.iterrows():
-        folium.CircleMarker([r.lat, r.lon], radius=7, color="red", fill=True, popup=r.name).add_to(m)
-    for _,r in ports.iterrows():
-        folium.CircleMarker([r.lat, r.lon], radius=7, color="blue", fill=True, popup=r.name).add_to(m)
+    # Generate synthetic co-ops: 2–3 per county around centroid
+    coop_rows = []
+    for cnt, (clat, clon) in COUNTY_CENTERS.items():
+        for i, (dlat, dlon) in enumerate([(0.10, 0.10), (-0.08, 0.12), (0.06, -0.10)], start=1):
+            coop_rows.append({
+                "name": f"{cnt} Co-op {i}",
+                "county": cnt,
+                "lat": clat + dlat,
+                "lon": clon + dlon,
+            })
+    coops = pd.DataFrame(coop_rows)
 
-    if res and isinstance(res["legs"], pd.DataFrame):
-        # draw legs between nodes (coops <-> plant)
-        for _, leg in res["legs"].iterrows():
-            i, j = int(leg["from"]), int(leg["to"])
-            p0 = (plants.lat.iloc[0], plants.lon.iloc[0]) if i==0 else (coops.lat.iloc[i-1], coops.lon.iloc[i-1])
-            p1 = (plants.lat.iloc[0], plants.lon.iloc[0]) if j==0 else (coops.lat.iloc[j-1], coops.lon.iloc[j-1])
-            folium.PolyLine([p0, p1], color="gray", weight=3, opacity=0.7).add_to(m)
-        st.session_state.vrp_cost = float(res["transport_cost_eur"])
-    else:
-        st.session_state.vrp_cost = 0.0
+    # Generate synthetic farms: up to 25 per county, random jitter near centroid
+    farm_rows = []
+    for cnt, (clat, clon) in COUNTY_CENTERS.items():
+        n = 25 if county_filter in ("All", cnt) else 8  # keep map light outside selected county
+        for i in range(n):
+            farm_rows.append({
+                "name": f"{cnt} Farm {i+1}",
+                "county": cnt,
+                "lat": float(clat + rng.uniform(-0.22, 0.22)),
+                "lon": float(clon + rng.uniform(-0.22, 0.22)),
+            })
+    farms = pd.DataFrame(farm_rows)
 
-    st_folium(m, width=None, height=420)
+    # Filter by county where applicable (farms & co-ops)
+    if county_filter and county_filter != "All":
+        farms = farms[farms["county"] == county_filter].reset_index(drop=True)
+        coops = coops[coops["county"] == county_filter].reset_index(drop=True)
+
+    # Base map
+    m = folium.Map(location=[53.4, -8.0], zoom_start=6, tiles="OpenStreetMap")
+
+    # Feature groups
+    fg_farms = folium.FeatureGroup(name="Farms", show=True)
+    fg_coops = folium.FeatureGroup(name="Co-ops", show=True)
+    fg_procs = folium.FeatureGroup(name="Processors", show=True)
+    fg_ports = folium.FeatureGroup(name="Ports", show=True)
+    fg_edges = folium.FeatureGroup(name="Connections", show=True)
+
+    # Add markers
+    for _, r in ports.iterrows():
+        folium.CircleMarker(
+            [r.lat, r.lon], radius=6, color="blue", fill=True, fill_opacity=0.9,
+            popup=f"Port: {r.name}"
+        ).add_to(fg_ports)
+
+    for _, r in processors.iterrows():
+        folium.CircleMarker(
+            [r.lat, r.lon], radius=7, color="red", fill=True, fill_opacity=0.9,
+            popup=f"Processor: {r.name} ({r.county})"
+        ).add_to(fg_procs)
+
+    for _, r in coops.iterrows():
+        folium.CircleMarker(
+            [r.lat, r.lon], radius=6, color="orange", fill=True, fill_opacity=0.9,
+            popup=f"Co-op: {r.name} ({r.county})"
+        ).add_to(fg_coops)
+
+    for _, r in farms.iterrows():
+        folium.CircleMarker(
+            [r.lat, r.lon], radius=4, color="green", fill=True, fill_opacity=0.8,
+            popup=f"Farm: {r.name} ({r.county})"
+        ).add_to(fg_farms)
+
+    # Nearest-neighbour helpers
+    def _nearest(lat, lon, df):
+        if df.empty:
+            return None, None, None
+        dists = df.apply(lambda row: haversine(lat, lon, row.lat, row.lon), axis=1)
+        idx = dists.idxmin()
+        dist = float(dists.loc[idx])
+        row = df.loc[idx]
+        return (row.lat, row.lon, dist)
+
+    total_km = 0.0
+    used_processor_idx = set()
+
+    # Connect farms -> co-ops
+    for _, f in farms.iterrows():
+        # Prefer co-ops in same county; fallback to any co-op if filtered set empty
+        same_cnt = coops[coops["county"] == f.county] if not coops.empty else pd.DataFrame()
+        candidates = same_cnt if not same_cnt.empty else coops
+        if candidates.empty:
+            continue
+        lat2, lon2, dkm = _nearest(f.lat, f.lon, candidates)
+        folium.PolyLine([[f.lat, f.lon], [lat2, lon2]], color="green", weight=2, opacity=0.6).add_to(fg_edges)
+        total_km += dkm
+
+    # Connect co-ops -> processors
+    for idx, c in coops.iterrows():
+        lat2, lon2, dkm = _nearest(c.lat, c.lon, processors)
+        if lat2 is None:
+            continue
+        folium.PolyLine([[c.lat, c.lon], [lat2, lon2]], color="orange", weight=2.5, opacity=0.7).add_to(fg_edges)
+        total_km += dkm
+        # Record nearest processor (match by coordinates)
+        near = processors.apply(lambda r: math.isclose(r.lat, lat2, abs_tol=1e-6) and math.isclose(r.lon, lon2, abs_tol=1e-6), axis=1)
+        if near.any():
+            used_processor_idx.add(int(near[near].index[0]))
+
+    # Connect processors -> ports (only for processors used by any co-op)
+    proc_subset = processors.iloc[list(used_processor_idx)] if used_processor_idx else processors
+    for _, p in proc_subset.iterrows():
+        lat2, lon2, dkm = _nearest(p.lat, p.lon, ports)
+        if lat2 is None:
+            continue
+        folium.PolyLine([[p.lat, p.lon], [lat2, lon2]], color="red", weight=3, opacity=0.65).add_to(fg_edges)
+        total_km += dkm
+
+    # Add groups + control
+    fg_farms.add_to(m); fg_coops.add_to(m); fg_procs.add_to(m); fg_ports.add_to(m); fg_edges.add_to(m)
+    folium.LayerControl(collapsed=False).add_to(m)
+
+    # Update a simple transport cost proxy (€/km)
+    km_cost = 1.6
+    st.session_state.vrp_cost = float(total_km * km_cost)
+
+    st_folium(m, width=None, height=460)
 
 # =========================== RAG + GPT ==================================
 def rag_embed_texts(texts):
@@ -670,7 +835,9 @@ No code or formulas; state implications, risks, opportunities."""
         st.info(f"({title}) Insight: Configure OPENAI_API_KEY for auto-explanations.")
 
 # =========================== Geospatial header + KPIs ====================
-render_geospatial_header()
+# County filter for the map
+county_filter = st.sidebar.selectbox("County filter", ["All"] + sorted(COUNTY_CENTERS.keys()))
+render_geospatial_header(county_filter)
 k_now = kpi_strip()
 alerts = check_alerts(st.session_state.ctx_alloc)
 if alerts:
