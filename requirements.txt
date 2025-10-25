@@ -20,7 +20,7 @@ ortools
 MILP # (optional; enables the Commercial Plan tab’s optimizer)
 pulp
 
-Dense RAG # (optional; app falls back to TF-IDF if absent)
+Dense-RAG # (optional; app falls back to TF-IDF if absent)
 sentence-transformers
 faiss-cpu
 
