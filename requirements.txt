@@ -7,15 +7,15 @@ scikit-learn
 openai
 
 # Maps (optional but recommended for the geospatial header)
-# folium
-# streamlit-folium
+folium
+streamlit-folium
 
 # PDF ingestion (optional; plain TXT fallback exists)
 # PyPDF2
 
 # VRP / Routing (optional; if omitted, map shows but routes/VRP cost are disabled)
 # ortools can be heavy; install only if you need the VRP solver
-# ortools
+ortools
 
 # MILP (optional; enables the Commercial Plan tab’s optimizer)
 # pulp
@@ -26,6 +26,6 @@ openai
 
 #Reinforcement Learning (PPO) — OPTIONAL and TensorBoard-FREE
 # If enabling RL, DO NOT install tensorflow/tensorboard.
-# gymnasium
-# stable-baselines3
-# torch
+gymnasium
+stable-baselines3
+torch
