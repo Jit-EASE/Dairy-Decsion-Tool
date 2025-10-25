@@ -11,7 +11,7 @@ folium
 streamlit-folium
 
 # PDF ingestion (optional; plain TXT fallback exists)
-# PyPDF2
+PyPDF2
 
 # VRP / Routing (optional; if omitted, map shows but routes/VRP cost are disabled)
 # ortools can be heavy; install only if you need the VRP solver
