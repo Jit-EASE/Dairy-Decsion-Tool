@@ -21,7 +21,7 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 
 st.markdown(
     """
-<div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
+<div style="text-align:center; background:#04F404; padding:1rem; border-radius:12px;">
   <h2>Irish Dairy Processing Decision Tool — <em>Executive Intelligent Edition</em></h2>
   <p>Quantum × AI × Optimisation for Ireland’s dairy industry.<br>
   QUBO · MILP · VRP · RAG with GPT-4o-mini auto-insights (PPO RL optional, TensorBoard-free).</p>
