@@ -1,0 +1,31 @@
+# === Core (runs the app end-to-end with TF-IDF RAG + no RL) ===
+streamlit==1.36.0
+numpy==1.26.4
+pandas==2.2.2
+plotly==5.23.0
+scikit-learn==1.5.1
+openai>=1.40.0
+
+# Maps (optional but recommended for the geospatial header)
+folium==0.16.0
+streamlit-folium==0.20.0
+
+# PDF ingestion (optional; plain TXT fallback exists)
+PyPDF2==3.0.1
+
+# VRP / Routing (optional; if omitted, map shows but routes/VRP cost are disabled)
+# ortools can be heavy; install only if you need the VRP solver
+# ortools==9.9.3963
+
+# MILP (optional; enables the Commercial Plan tab’s optimizer)
+# pulp==2.7.0
+
+# Dense RAG (optional; app falls back to TF-IDF if absent)
+# sentence-transformers==2.7.0
+# faiss-cpu==1.8.0.post5
+
+# Reinforcement Learning (PPO) — OPTIONAL and TensorBoard-FREE
+# If enabling RL, DO NOT install tensorflow/tensorboard.
+# gymnasium==0.29.1
+# stable-baselines3==2.3.2
+# torch>=2.2
