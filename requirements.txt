@@ -17,12 +17,12 @@ streamlit-folium
 # ortools can be heavy; install only if you need the VRP solver
 ortools
 
-# MILP (optional; enables the Commercial Plan tab’s optimizer)
-# pulp
+MILP # (optional; enables the Commercial Plan tab’s optimizer)
+pulp
 
-# Dense RAG (optional; app falls back to TF-IDF if absent)
-# sentence-transformers
-# faiss-cpu
+Dense RAG # (optional; app falls back to TF-IDF if absent)
+sentence-transformers
+faiss-cpu
 
 #Reinforcement Learning (PPO) — OPTIONAL and TensorBoard-FREE
 # If enabling RL, DO NOT install tensorflow/tensorboard.
