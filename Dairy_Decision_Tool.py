@@ -22,7 +22,7 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 st.markdown(
     """
 <div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
-  <h2>Self Learning Dairy Processing Decision Tool (Autonomous) — Ireland </em></h2>
+  <h2>Autonomous Dairy Processing Decision Tool — Ireland </em></h2>
   <p>Self Aware Adaptive Multimodal System (SAAMS) </p>
 </div>
 """,
