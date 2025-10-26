@@ -24,12 +24,12 @@ st.markdown(
 <div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
   <h2>Irish Dairy Processing Decision Tool — <em>Executive Intelligent Edition</em></h2>
   <p>Quantum × AI × Optimisation for Ireland’s dairy industry.<br>
-  QUBO · MILP · VRP · RAG with GPT-4o-mini auto-insights (PPO RL optional, TensorBoard-free).</p>
+  QUBO · MILP · VRP · Agentic RAG.</p>
 </div>
 """,
     unsafe_allow_html=True,
 )
-st.caption("Built by Jit | Streamlit Cloud | Python 3.11/3.12 (TensorBoard-free)")
+st.caption("Built by Shubhojit Bagchi")
 
 # ---------------- Dependency scan (IMPORT-FREE using find_spec) ----------
 def _has_mod(name: str) -> bool:
