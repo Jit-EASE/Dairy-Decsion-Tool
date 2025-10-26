@@ -1136,7 +1136,7 @@ elif section == "Executive Summary & Comparisons":
 
 # =========================== Meta-Learning Controller ===========================
 st.divider()
-st.header("Meta-Learning Controller (Self-Learning Loop)")
+st.header("Meta-Learning Controller")
 
 st.markdown("""
 This module allows the tool to automatically evaluate past performance and 
