@@ -22,14 +22,14 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 st.markdown(
     """
 <div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
-  <h2>Self Learning Dairy Processing Decision Tool - Ireland <em></em></h2>
-  <p>Quantum × AI × Econometrics × Geo-Spatial Analytics × Optimisation for Ireland’s dairy industry.<br>
-  QUBO · MILP · VRP · Agentic RAG.</p>
+  <h2>Irish Dairy Processing Decision Tool — <em>Executive Intelligent Edition</em></h2>
+  <p>Quantum × AI × Optimisation for Ireland’s dairy industry.<br>
+  QUBO · MILP · VRP · RAG with GPT-4o-mini auto-insights (PPO RL optional, TensorBoard-free).</p>
 </div>
 """,
     unsafe_allow_html=True,
 )
-st.caption("Built by Shubhojit Bagchi")
+st.caption("Built by Jit | Streamlit Cloud | Python 3.11/3.12 (TensorBoard-free)")
 
 # ---------------- Dependency scan (IMPORT-FREE using find_spec) ----------
 def _has_mod(name: str) -> bool:
@@ -76,11 +76,11 @@ SECTIONS = [
     "Milk Quality & Supply",
     "Market Intelligence & Forecasts",
     "Production Portfolio Optimizer",
-    "Learning Allocator",
-    "Commercial Plan",
+    "Learning Allocator (AI, optional)",
+    "Commercial Plan (MILP)",
     "Sustainability Dashboard",
     "Scenario Simulator",
-    "Intelligent Advisor",
+    "Intelligent Advisor (RAG + GPT)",
     "Executive Summary & Comparisons",
 ]
 section = st.sidebar.radio("Navigate", SECTIONS, index=0)
@@ -1134,3 +1134,65 @@ elif section == "Executive Summary & Comparisons":
         st.info("Run QUBO, PPO, or MILP to populate the comparison.")
 
     explain_section(section, "Summarises outcomes and provides board-ready exports.")
+
+# =========================== Meta-Learning Controller ===========================
+st.divider()
+st.header("Meta-Learning Controller (Self-Learning Loop)")
+
+st.markdown("""
+This module allows the tool to automatically evaluate past performance and 
+choose the best optimisation strategy (QUBO, PPO, or MILP) for the next run 
+based on KPI deltas. It enables self-learning by observing its own outcomes.
+""")
+
+if "meta_memory" not in st.session_state:
+    st.session_state["meta_memory"] = []
+
+# Record current allocation + KPIs into memory
+if st.button("Record Current KPIs to Memory"):
+    rec = {
+        "timestamp": datetime.now().isoformat(),
+        "source": st.session_state.get("_alloc_source", "auto"),
+        "kpi": kpi_from_allocation(st.session_state.ctx_alloc, st.session_state.vrp_cost)
+    }
+    st.session_state["meta_memory"].append(rec)
+    st.success(f"Recorded allocation from {rec['source']} at {rec['timestamp']}.")
+
+# Evaluate KPI deltas and select next strategy
+if st.button("Evaluate and Select Next Strategy"):
+    mem = st.session_state.get("meta_memory", [])
+    if len(mem) < 2:
+        st.warning("At least two KPI records are required for comparison.")
+    else:
+        last, prev = mem[-1]["kpi"], mem[-2]["kpi"]
+        delta_margin = last["margin"] - prev["margin"]
+        delta_co2 = prev["co2e"] - last["co2e"]
+        delta_energy = prev["kwh"] - last["kwh"]
+
+        st.write(f"ΔMargin: {delta_margin:,.0f}, ΔCO₂e: {delta_co2:,.1f}, ΔEnergy: {delta_energy:,.1f}")
+
+        # Strategy selection logic
+        if delta_margin > 0 and delta_co2 >= 0:
+            next_strategy = "QUBO"
+        elif delta_margin > 0 and delta_energy >= 0:
+            next_strategy = "MILP"
+        else:
+            next_strategy = "PPO"
+
+        st.session_state["meta_next"] = next_strategy
+        st.success(f"Meta-Learner suggests next optimisation: **{next_strategy}**")
+
+# Display meta-memory and trends
+if st.checkbox("Show Learning Memory"):
+    if st.session_state["meta_memory"]:
+        dfm = pd.DataFrame([
+            {"Time": r["timestamp"], "Source": r["source"], **r["kpi"]}
+            for r in st.session_state["meta_memory"]
+        ])
+        st.dataframe(dfm, use_container_width=True)
+        figm = px.line(dfm, x="Time", y=["margin","co2e","kwh"], title="Learning Trends (Margin/CO₂e/Energy)")
+        st.plotly_chart(figm, use_container_width=True)
+    else:
+        st.info("No memory recorded yet. Record KPI snapshots after running QUBO, PPO, or MILP.")
+
+st.caption("Autonomous decision loop: observes → compares → re-optimises → learns.")
