@@ -22,8 +22,8 @@ st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layo
 st.markdown(
     """
 <div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
-  <h2>Self Learning Dairy Processing Decision Tool — Ireland <em>Executive Intelligent Edition</em></h2>
-  <p>Autonomous System.<br>
+  <h2>Self Learning Dairy Processing Decision Tool — Ireland </em></h2>
+  <p>Autonomous Fusion System.<br>
   Adaptive Model.</p>
 </div>
 """,
