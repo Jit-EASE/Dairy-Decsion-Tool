@@ -76,11 +76,11 @@ SECTIONS = [
     "Milk Quality & Supply",
     "Market Intelligence & Forecasts",
     "Production Portfolio Optimizer",
-    "Learning Allocator (AI, optional)",
-    "Commercial Plan (MILP)",
+    "Learning Allocator",
+    "Commercial Plan",
     "Sustainability Dashboard",
     "Scenario Simulator",
-    "Intelligent Advisor (RAG + GPT)",
+    "Intelligent Advisor",
     "Executive Summary & Comparisons",
 ]
 section = st.sidebar.radio("Navigate", SECTIONS, index=0)
