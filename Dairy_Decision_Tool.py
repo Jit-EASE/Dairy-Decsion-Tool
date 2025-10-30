@@ -17,7 +17,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # ========================== App config & header ==========================
-st.set_page_config(page_title="Irish Dairy — Executive Intelligent Tool", layout="wide")
+st.set_page_config(page_title="Irish Dairy — Production and Supply Chain Decision System", layout="wide")
 
 st.markdown(
     """
@@ -28,7 +28,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.caption("Built by Shubhojit Bagchi")
+st.caption("Developed by Shubhojit Bagchi")
 
 # ---------------- Dependency scan (IMPORT-FREE using find_spec) ----------
 def _has_mod(name: str) -> bool:
