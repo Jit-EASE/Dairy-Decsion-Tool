@@ -22,8 +22,8 @@ st.set_page_config(page_title="Irish Dairy — Production and Supply Chain Decis
 st.markdown(
     """
 <div style="text-align:center; background:#e8f0fe; padding:1rem; border-radius:12px;">
-  <h2>Autonomous Dairy Processing Decision Tool — Ireland </em></h2>
-  <p>Self Aware Adaptive Multimodal System (SAAMS) </p>
+  <h2>Self Learning Dairy — Production and Supply Chain Decision System - Ireland</em></h2>
+  <p> Quantum Econometrics | Geospatial Analytics | Agentic AI | Supply Chain Networks </p>
 </div>
 """,
     unsafe_allow_html=True,
